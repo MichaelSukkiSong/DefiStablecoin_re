@@ -5,8 +5,9 @@ pragma solidity ^0.8.18;
 import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract DSCEngine {
+contract DSCEngine is ReentrancyGuard {
     ///////////////
     // errors    //
     ///////////////
@@ -99,7 +100,7 @@ contract DSCEngine {
         redeemCollateral(tokenCollateralAddress, amountCollateral);
     }
 
-    function liquidate() external {}
+    function liquidate() external nonReentrant {}
 
     ///////////////
     // public //
@@ -109,6 +110,7 @@ contract DSCEngine {
         public
         moreThanZero(amountCollateral)
         isAllowedToken(tokenCollateralAddress)
+        nonReentrant
     {
         s_collateralDeposited[msg.sender][tokenCollateralAddress] += amountCollateral;
         emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
@@ -121,6 +123,7 @@ contract DSCEngine {
     function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral)
         public
         moreThanZero(amountCollateral)
+        nonReentrant
     {
         s_collateralDeposited[msg.sender][tokenCollateralAddress] -= amountCollateral;
         emit CollateralRedeemed(msg.sender, msg.sender, tokenCollateralAddress, amountCollateral);
@@ -131,7 +134,7 @@ contract DSCEngine {
         _revertIfHealthFactorIsBroken(msg.sender);
     }
 
-    function mintDsc(uint256 amountDscToMint) public moreThanZero(amountDscToMint) {
+    function mintDsc(uint256 amountDscToMint) public moreThanZero(amountDscToMint) nonReentrant {
         s_DSCMinted[msg.sender] += amountDscToMint;
         _revertIfHealthFactorIsBroken(msg.sender);
         bool minted = i_dsc.mint(msg.sender, amountDscToMint);
