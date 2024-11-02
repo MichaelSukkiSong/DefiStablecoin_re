@@ -127,6 +127,26 @@ contract DSCEngine is ReentrancyGuard {
         _revertIfHealthFactorIsBroken(msg.sender);
     }
 
+    function getAccountInformation(address user)
+        external
+        view
+        returns (uint256 totalDscMinted, uint256 collateralValueInUsd)
+    {
+        (totalDscMinted, collateralValueInUsd) = _getAccountInformation(user);
+    }
+
+    function calculateHealthFactor(uint256 totalDscMinted, uint256 collateralValueInUsd)
+        external
+        pure
+        returns (uint256)
+    {
+        return _calculateHealthFactor(totalDscMinted, collateralValueInUsd);
+    }
+
+    function healthFactor(address user) external view returns (uint256) {
+        return _healthFactor(user);
+    }
+
     ///////////////
     // public //
     ///////////////
@@ -251,4 +271,20 @@ contract DSCEngine is ReentrancyGuard {
     ///////////////////////////
     // view & pure functions //
     ///////////////////////////
+
+    function getCollateralTokens() external view returns (address[] memory) {
+        return s_collateralTokens;
+    }
+
+    function getCollateralBalanceOfUser(address user, address token) external view returns (uint256) {
+        return s_collateralDeposited[user][token];
+    }
+
+    function getDSCMintedAmountOfUser(address user) external view returns (uint256) {
+        return s_DSCMinted[user];
+    }
+
+    function getPriceFeedAddress(address token) external view returns (address) {
+        return s_priceFeeds[token];
+    }
 }
