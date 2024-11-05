@@ -272,8 +272,16 @@ contract DSCEngine is ReentrancyGuard {
     // view & pure functions //
     ///////////////////////////
 
+    function getPriceFeedAddress(address token) external view returns (address) {
+        return s_priceFeeds[token];
+    }
+
     function getCollateralTokens() external view returns (address[] memory) {
         return s_collateralTokens;
+    }
+
+    function getDSC() external view returns (DecentralizedStableCoin) {
+        return i_dsc;
     }
 
     function getCollateralBalanceOfUser(address user, address token) external view returns (uint256) {
@@ -282,9 +290,5 @@ contract DSCEngine is ReentrancyGuard {
 
     function getDSCMintedAmountOfUser(address user) external view returns (uint256) {
         return s_DSCMinted[user];
-    }
-
-    function getPriceFeedAddress(address token) external view returns (address) {
-        return s_priceFeeds[token];
     }
 }
