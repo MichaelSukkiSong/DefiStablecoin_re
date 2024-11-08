@@ -102,13 +102,27 @@ contract DSCEngineTest is Test {
         assertEq(AMOUNT_COLLATERAL, expectedDepositAmount);
     }
 
-    function test_DataStructureIsProperlyUpdated() public depositedCollateral {}
+    function test_DataStructureIsProperlyUpdated() public depositedCollateral {
+        assertEq(dsce.getCollateralBalanceOfUser(USER, weth), AMOUNT_COLLATERAL);
+    }
 
-    function test_EmitsCollateralDepositedEvent() public depositedCollateral {}
+    function test_EmitsCollateralDepositedEvent() public {
+        vm.startPrank(USER);
+        ERC20Mock(weth).approve(address(dsce), AMOUNT_COLLATERAL);
 
-    function test_TokenTransferIsCorrect() public depositedCollateral {}
+        vm.expectEmit(true, true, true, false);
+        emit DSCEngine.CollateralDeposited(USER, weth, AMOUNT_COLLATERAL);
 
-    function test_RevertsIfTokenTransferFails() public depositedCollateral {}
+        dsce.depositCollateral(weth, AMOUNT_COLLATERAL);
+        vm.stopPrank();
+    }
+
+    function test_TokenTransferIsCorrect() public depositedCollateral {
+        assertEq(ERC20Mock(weth).balanceOf(USER), STARTING_ERC20_BALANCE - AMOUNT_COLLATERAL);
+        assertEq(ERC20Mock(weth).balanceOf(address(dsce)), AMOUNT_COLLATERAL);
+    }
+
+    function test_RevertsIfTokenTransferFails() public {}
 
     ////////////////////////////
     // redeemCollateral Tests //
