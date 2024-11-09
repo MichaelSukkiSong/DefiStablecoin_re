@@ -8,26 +8,36 @@ import {DSCEngine} from "../../src/DSCEngine.sol";
 import {DeployDSC} from "../../script/DeployDSC.s.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
+import {MockFailedTransferFrom} from "../mocks/MockFailedTransferFrom.sol";
 
 contract DSCEngineTest is Test {
-    DeployDSC deployer;
+    DeployDSC deploydsc;
     DecentralizedStableCoin dsc;
     DSCEngine dsce;
     HelperConfig config;
+
     address ethUsdPriceFeed;
     address btcUsdPriceFeed;
     address weth;
     address wbtc;
+    address deployer;
 
     address public USER = makeAddr("user");
     uint256 public constant STARTING_ERC20_BALANCE = 10 ether;
     uint256 public constant AMOUNT_COLLATERAL = 10 ether;
 
+    event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
+    event CollateralRedeemed(
+        address indexed redeemedFrom, address indexed redeemedTo, address indexed token, uint256 amount
+    );
+
     function setUp() external {
-        deployer = new DeployDSC();
-        (dsc, dsce, config) = deployer.run();
-        (ethUsdPriceFeed, btcUsdPriceFeed, weth, wbtc,) = config.activeNetworkConfig();
+        deploydsc = new DeployDSC();
+        (dsc, dsce, config) = deploydsc.run();
+        (ethUsdPriceFeed, btcUsdPriceFeed, weth, wbtc, deployer) = config.activeNetworkConfig();
+
         ERC20Mock(weth).mint(USER, STARTING_ERC20_BALANCE);
+        ERC20Mock(wbtc).mint(USER, STARTING_ERC20_BALANCE);
     }
 
     ///////////////////////
@@ -111,7 +121,7 @@ contract DSCEngineTest is Test {
         ERC20Mock(weth).approve(address(dsce), AMOUNT_COLLATERAL);
 
         vm.expectEmit(true, true, true, false);
-        emit DSCEngine.CollateralDeposited(USER, weth, AMOUNT_COLLATERAL);
+        emit CollateralDeposited(USER, weth, AMOUNT_COLLATERAL);
 
         dsce.depositCollateral(weth, AMOUNT_COLLATERAL);
         vm.stopPrank();
@@ -122,7 +132,31 @@ contract DSCEngineTest is Test {
         assertEq(ERC20Mock(weth).balanceOf(address(dsce)), AMOUNT_COLLATERAL);
     }
 
-    function test_RevertsIfTokenTransferFails() public {}
+    // this test needs it's own setup - MockFailedTransferFrom.sol
+    function test_RevertsIfTransferFromFails() public {
+        // Arrange - Setup
+        address owner = msg.sender;
+        vm.prank(owner);
+        MockFailedTransferFrom mockDsc = new MockFailedTransferFrom();
+
+        tokenAddresses = [address(mockDsc)];
+        priceFeedAddresses = [ethUsdPriceFeed];
+
+        vm.prank(owner);
+        DSCEngine mockDsce = new DSCEngine(tokenAddresses, priceFeedAddresses, address(mockDsc));
+        mockDsc.mint(USER, AMOUNT_COLLATERAL);
+
+        vm.prank(owner);
+        mockDsc.transferOwnership(address(mockDsce));
+
+        // Arrange - User
+        vm.startPrank(USER);
+        ERC20Mock(address(mockDsc)).approve(address(mockDsce), AMOUNT_COLLATERAL);
+        // Act / Assert
+        vm.expectRevert(DSCEngine.DSCEngine__TransferFailed.selector);
+        mockDsce.depositCollateral(address(mockDsc), AMOUNT_COLLATERAL);
+        vm.stopPrank();
+    }
 
     ////////////////////////////
     // redeemCollateral Tests //
