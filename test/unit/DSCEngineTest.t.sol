@@ -185,6 +185,18 @@ contract DSCEngineTest is Test {
         vm.stopPrank();
     }
 
+    modifier redeemedCollateral() {
+        vm.startPrank(USER);
+        dsce.redeemCollateral(weth, AMOUNT_COLLATERAL);
+        vm.stopPrank();
+        _;
+    }
+
+    function test_TokenIsTransferedCorrectly() public depositedCollateral redeemedCollateral {
+        assertEq(ERC20Mock(weth).balanceOf(USER), STARTING_ERC20_BALANCE);
+        assertEq(ERC20Mock(weth).balanceOf(address(dsce)), 0);
+    }
+
     function test_RevertsIfTransferFails() public {
         // Arrange - Setup
         address owner = msg.sender;
