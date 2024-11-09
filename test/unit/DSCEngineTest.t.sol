@@ -9,6 +9,7 @@ import {DeployDSC} from "../../script/DeployDSC.s.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
 import {MockFailedTransferFrom} from "../mocks/MockFailedTransferFrom.sol";
+import {MockFailedTransfer} from "../mocks/MockFailedTransfer.sol";
 
 contract DSCEngineTest is Test {
     DeployDSC deploydsc;
@@ -56,7 +57,7 @@ contract DSCEngineTest is Test {
         new DSCEngine(tokenAddresses, priceFeedAddresses, address(dsc));
     }
 
-    function test_DataStructuresAreProperlyUpdated() public {
+    function test_CollateralDepositedDataStructuresAreProperlyAdded() public {
         tokenAddresses.push(weth);
         tokenAddresses.push(wbtc);
         priceFeedAddresses.push(ethUsdPriceFeed);
@@ -77,7 +78,7 @@ contract DSCEngineTest is Test {
     // depositCollateral Tests //
     /////////////////////////////
 
-    function test_RevertsIfCollateralZero() public {
+    function test_RevertsIfDepositCollateralZero() public {
         vm.startPrank(USER);
         ERC20Mock(weth).approve(address(dsce), AMOUNT_COLLATERAL);
 
@@ -161,6 +162,57 @@ contract DSCEngineTest is Test {
     ////////////////////////////
     // redeemCollateral Tests //
     ////////////////////////////
+
+    function test_RevertsIfRedeemCollateralZero() public depositedCollateral {
+        vm.startPrank(USER);
+        vm.expectRevert(DSCEngine.DSCEngine__NeedsMoreThanZero.selector);
+        dsce.redeemCollateral(weth, 0);
+        vm.stopPrank();
+    }
+
+    function test_CollateralDepositedDataStructuresAreProperlyDecreased() public depositedCollateral {
+        vm.startPrank(USER);
+        dsce.redeemCollateral(weth, AMOUNT_COLLATERAL);
+        vm.stopPrank();
+        assertEq(dsce.getCollateralBalanceOfUser(USER, weth), 0);
+    }
+
+    function test_EmitsCollateralRedeemedEvent() public depositedCollateral {
+        vm.startPrank(USER);
+        vm.expectEmit(true, true, true, false);
+        emit CollateralRedeemed(USER, USER, weth, AMOUNT_COLLATERAL);
+        dsce.redeemCollateral(weth, AMOUNT_COLLATERAL);
+        vm.stopPrank();
+    }
+
+    function test_RevertsIfTransferFails() public {
+        // Arrange - Setup
+        address owner = msg.sender;
+        vm.prank(owner);
+        MockFailedTransfer mockDsc = new MockFailedTransfer();
+
+        tokenAddresses = [address(mockDsc)];
+        priceFeedAddresses = [ethUsdPriceFeed];
+
+        vm.prank(owner);
+        DSCEngine mockDsce = new DSCEngine(tokenAddresses, priceFeedAddresses, address(mockDsc));
+        mockDsc.mint(USER, AMOUNT_COLLATERAL);
+
+        vm.prank(owner);
+        mockDsc.transferOwnership(address(mockDsce));
+
+        // Arrange - User
+        vm.startPrank(USER);
+        ERC20Mock(address(mockDsc)).approve(address(mockDsce), AMOUNT_COLLATERAL);
+        mockDsce.depositCollateral(address(mockDsc), AMOUNT_COLLATERAL);
+        vm.stopPrank();
+
+        // Act / Assert
+        vm.startPrank(USER);
+        vm.expectRevert(DSCEngine.DSCEngine__TransferFailed.selector);
+        mockDsce.redeemCollateral(address(mockDsc), AMOUNT_COLLATERAL);
+        vm.stopPrank();
+    }
 
     ///////////////////
     // mintDsc Tests //
