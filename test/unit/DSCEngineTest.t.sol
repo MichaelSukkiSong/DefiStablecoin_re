@@ -10,6 +10,7 @@ import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
 import {MockFailedTransferFrom} from "../mocks/MockFailedTransferFrom.sol";
 import {MockFailedTransfer} from "../mocks/MockFailedTransfer.sol";
+import {MockFailedMintDSC} from "../mocks/MockFailedMintDSC.sol";
 
 contract DSCEngineTest is Test {
     DeployDSC deploydsc;
@@ -26,6 +27,7 @@ contract DSCEngineTest is Test {
     address public USER = makeAddr("user");
     uint256 public constant STARTING_ERC20_BALANCE = 10 ether;
     uint256 public constant AMOUNT_COLLATERAL = 10 ether;
+    uint256 public constant AMOUNT_DSC_TO_MINT = 1 ether;
 
     event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
     event CollateralRedeemed(
@@ -229,6 +231,63 @@ contract DSCEngineTest is Test {
     ///////////////////
     // mintDsc Tests //
     ///////////////////
+
+    function test_AmountDscToMintIsMoreThanZero() public depositedCollateral {
+        vm.startPrank(USER);
+        vm.expectRevert(DSCEngine.DSCEngine__NeedsMoreThanZero.selector);
+        dsce.mintDsc(0);
+        vm.stopPrank();
+    }
+
+    function test_DSCMintedDataStructuresAreProperlyUpdated() public depositedCollateral {
+        vm.startPrank(USER);
+        dsce.mintDsc(AMOUNT_DSC_TO_MINT);
+        vm.stopPrank();
+
+        assertEq(dsce.getDSCMintedAmountOfUser(USER), AMOUNT_DSC_TO_MINT);
+    }
+
+    modifier mintedDsc() {
+        vm.startPrank(USER);
+        dsce.mintDsc(AMOUNT_DSC_TO_MINT);
+        vm.stopPrank();
+        _;
+    }
+
+    function test_DscIsProperlyMinted() public depositedCollateral mintedDsc {
+        assertEq(ERC20Mock(address(dsc)).balanceOf(USER), AMOUNT_DSC_TO_MINT);
+    }
+
+    function test_RevertsIfMintDscFails() public {
+        // Arrange - Setup
+        address owner = msg.sender;
+        vm.prank(owner);
+        MockFailedMintDSC mockDsc = new MockFailedMintDSC();
+
+        tokenAddresses = [address(mockDsc)];
+        priceFeedAddresses = [ethUsdPriceFeed];
+
+        vm.prank(owner);
+        DSCEngine mockDsce = new DSCEngine(tokenAddresses, priceFeedAddresses, address(mockDsc));
+
+        vm.prank(owner);
+        mockDsc.mint(USER, AMOUNT_COLLATERAL);
+
+        vm.prank(owner);
+        mockDsc.transferOwnership(address(mockDsce));
+
+        // Arrange - User
+        vm.startPrank(USER);
+        ERC20Mock(address(mockDsc)).approve(address(mockDsce), AMOUNT_COLLATERAL);
+        mockDsce.depositCollateral(address(mockDsc), AMOUNT_COLLATERAL);
+        vm.stopPrank();
+
+        // Act / Assert
+        vm.startPrank(USER);
+        vm.expectRevert(DSCEngine.DSCEngine__MintFailed.selector);
+        mockDsce.mintDsc(AMOUNT_DSC_TO_MINT);
+        vm.stopPrank();
+    }
 
     ///////////////////
     // burnDsc Tests //
