@@ -31,10 +31,15 @@ contract DSCEngineTest is Test {
 
     uint256 public constant STARTING_ERC20_BALANCE = 10 ether;
     uint256 public constant AMOUNT_COLLATERAL = 10 ether;
+    uint256 public constant AMOUNT_COLLATERAL_LIQUIDATEABLE = 0.1 ether;
+    uint256 public constant AMOUNT_COLLATERAL_LIQUIDATOR = 0.2 ether;
     uint256 public constant AMOUNT_DSC_TO_MINT = 1 ether;
     uint256 public constant COLLATERAL_TO_COVER = 10 ether;
+    uint256 public constant STARTING_ERC20_BALANCE_LIQUIDATOR = 0.2 ether;
 
     uint256 public constant MIN_HEALTH_FACTOR = 1e18;
+    uint256 private constant LIQUIDATION_PRECISION = 100;
+    uint256 private constant LIQUIDATION_BONUS = 10;
 
     event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
     event CollateralRedeemed(
@@ -426,26 +431,36 @@ contract DSCEngineTest is Test {
 
     modifier liquidated() {
         vm.startPrank(USER);
-        ERC20Mock(weth).approve(address(dsce), AMOUNT_COLLATERAL);
-        dsce.depositCollateralAndMintDsc(weth, AMOUNT_COLLATERAL, AMOUNT_DSC_TO_MINT);
+        ERC20Mock(weth).approve(address(dsce), AMOUNT_COLLATERAL_LIQUIDATEABLE);
+        dsce.depositCollateralAndMintDsc(weth, AMOUNT_COLLATERAL_LIQUIDATEABLE, AMOUNT_DSC_TO_MINT);
         vm.stopPrank();
-        int256 ethUsdUpdatedPrice = 18e8; // 1 ETH = $18
 
+        int256 ethUsdUpdatedPrice = 18e8; // 1 ETH = $18
         MockV3Aggregator(ethUsdPriceFeed).updateAnswer(ethUsdUpdatedPrice);
         // uint256 userHealthFactor = dsce.getHealthFactor(USER);
 
-        ERC20Mock(weth).mint(LIQUIDATOR, COLLATERAL_TO_COVER);
+        ERC20Mock(weth).mint(LIQUIDATOR, STARTING_ERC20_BALANCE_LIQUIDATOR);
 
         vm.startPrank(LIQUIDATOR);
-        ERC20Mock(weth).approve(address(dsce), COLLATERAL_TO_COVER);
-        dsce.depositCollateralAndMintDsc(weth, COLLATERAL_TO_COVER, AMOUNT_DSC_TO_MINT);
+        ERC20Mock(weth).approve(address(dsce), AMOUNT_COLLATERAL_LIQUIDATOR);
+        dsce.depositCollateralAndMintDsc(weth, AMOUNT_COLLATERAL_LIQUIDATOR, AMOUNT_DSC_TO_MINT);
         dsc.approve(address(dsce), AMOUNT_DSC_TO_MINT);
         dsce.liquidate(weth, USER, AMOUNT_DSC_TO_MINT); // We are covering their whole debt
         vm.stopPrank();
         _;
     }
 
-    function test_RedeemsCollateralFromUserToCaller() public {}
+    function test_RedeemsCollateralFromUserToLiquidator() public liquidated {
+        uint256 tokenAmountFromDebtCovered = dsce.getTokenAmountFromUsd(weth, AMOUNT_DSC_TO_MINT);
+        uint256 bonusCollateral = (tokenAmountFromDebtCovered * LIQUIDATION_BONUS) / LIQUIDATION_PRECISION;
+        uint256 totalCollateralToRedeem = tokenAmountFromDebtCovered + bonusCollateral;
+
+        // console.log(totalCollateralToRedeem);
+        // console.log(AMOUNT_COLLATERAL_LIQUIDATEABLE - totalCollateralToRedeem);
+        // console.log(AMOUNT_COLLATERAL_LIQUIDATOR + totalCollateralToRedeem);
+
+        assertEq(dsce.getCollateralBalanceOfUser(USER, weth), AMOUNT_COLLATERAL_LIQUIDATEABLE - totalCollateralToRedeem);
+    }
 
     function test_BurnsDscOnBehalfOfUserFromCaller() public {}
 
