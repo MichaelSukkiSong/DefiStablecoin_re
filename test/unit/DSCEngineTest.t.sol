@@ -13,6 +13,7 @@ import {MockFailedTransfer} from "../mocks/MockFailedTransfer.sol";
 import {MockFailedMintDSC} from "../mocks/MockFailedMintDSC.sol";
 import {MockFailedTransferFromDSC} from "../mocks/MockFailedTransferFromDSC.sol";
 import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
+import {MockMoreDebtDSC} from "../mocks/MockMoreDebtDSC.sol";
 
 contract DSCEngineTest is Test {
     DeployDSC deploydsc;
@@ -25,6 +26,9 @@ contract DSCEngineTest is Test {
     address weth;
     address wbtc;
     address deployer;
+
+    address[] public tokenAddresses;
+    address[] public priceFeedAddresses;
 
     address public USER = makeAddr("user");
     address public LIQUIDATOR = makeAddr("liquidator");
@@ -57,9 +61,6 @@ contract DSCEngineTest is Test {
     ///////////////////////
     // Constructor Tests //
     ///////////////////////
-
-    address[] public tokenAddresses;
-    address[] public priceFeedAddresses;
 
     function test_RevertsIfTokenLengthDoesntMatchPriceFeeds() public {
         tokenAddresses.push(weth);
@@ -462,7 +463,37 @@ contract DSCEngineTest is Test {
         assertEq(DecentralizedStableCoin(dsc).balanceOf(LIQUIDATOR), 0);
     }
 
-    function test_RevertsIfEndingUserHealthFactorIsSmallerThanStartingUserHealthFactor() public {}
+    function test_RevertsIfEndingUserHealthFactorIsSmallerThanStartingUserHealthFactor() public {
+        // Arrange - Setup
+        MockMoreDebtDSC mockDsc = new MockMoreDebtDSC(ethUsdPriceFeed);
+        tokenAddresses = [weth];
+        priceFeedAddresses = [ethUsdPriceFeed];
+        address owner = msg.sender;
+        vm.prank(owner);
+        DSCEngine mockDsce = new DSCEngine(tokenAddresses, priceFeedAddresses, address(mockDsc));
+        mockDsc.transferOwnership(address(mockDsce));
+        // Arrange - User
+        vm.startPrank(USER);
+        ERC20Mock(weth).approve(address(mockDsce), AMOUNT_COLLATERAL_LIQUIDATEABLE);
+        mockDsce.depositCollateralAndMintDsc(weth, AMOUNT_COLLATERAL_LIQUIDATEABLE, AMOUNT_DSC_TO_MINT);
+        vm.stopPrank();
+
+        // Arrange - Liquidator
+        ERC20Mock(weth).mint(LIQUIDATOR, AMOUNT_COLLATERAL_LIQUIDATOR);
+
+        vm.startPrank(LIQUIDATOR);
+        ERC20Mock(weth).approve(address(mockDsce), AMOUNT_COLLATERAL_LIQUIDATOR);
+        uint256 debtToCover = 0.1 ether;
+        mockDsce.depositCollateralAndMintDsc(weth, AMOUNT_COLLATERAL_LIQUIDATOR, AMOUNT_DSC_TO_MINT);
+        mockDsc.approve(address(mockDsce), debtToCover);
+        // Act
+        int256 ethUsdUpdatedPrice = 18e8; // 1 ETH = $18
+        MockV3Aggregator(ethUsdPriceFeed).updateAnswer(ethUsdUpdatedPrice);
+        // Act/Assert
+        vm.expectRevert(DSCEngine.DSCEngine__HealthFactorNotImproved.selector);
+        mockDsce.liquidate(weth, USER, debtToCover);
+        vm.stopPrank();
+    }
 
     /////////////////////////////////////
     // getAccountCollateralValue Tests //
