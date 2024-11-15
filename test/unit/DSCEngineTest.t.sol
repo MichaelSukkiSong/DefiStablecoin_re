@@ -31,10 +31,9 @@ contract DSCEngineTest is Test {
 
     uint256 public constant STARTING_ERC20_BALANCE = 10 ether;
     uint256 public constant AMOUNT_COLLATERAL = 10 ether;
+    uint256 public constant AMOUNT_DSC_TO_MINT = 1 ether;
     uint256 public constant AMOUNT_COLLATERAL_LIQUIDATEABLE = 0.1 ether;
     uint256 public constant AMOUNT_COLLATERAL_LIQUIDATOR = 0.2 ether;
-    uint256 public constant AMOUNT_DSC_TO_MINT = 1 ether;
-    uint256 public constant COLLATERAL_TO_COVER = 10 ether;
     uint256 public constant STARTING_ERC20_BALANCE_LIQUIDATOR = 0.2 ether;
 
     uint256 public constant MIN_HEALTH_FACTOR = 1e18;
@@ -385,12 +384,12 @@ contract DSCEngineTest is Test {
 
         // uint256 userHealthFactor = dsce.getHealthFactor(USER);
 
-        ERC20Mock(weth).mint(LIQUIDATOR, COLLATERAL_TO_COVER);
+        ERC20Mock(weth).mint(LIQUIDATOR, AMOUNT_COLLATERAL);
 
         vm.startPrank(LIQUIDATOR);
 
-        ERC20Mock(weth).approve(address(dsce), COLLATERAL_TO_COVER);
-        dsce.depositCollateralAndMintDsc(weth, COLLATERAL_TO_COVER, AMOUNT_DSC_TO_MINT);
+        ERC20Mock(weth).approve(address(dsce), AMOUNT_COLLATERAL);
+        dsce.depositCollateralAndMintDsc(weth, AMOUNT_COLLATERAL, AMOUNT_DSC_TO_MINT);
 
         dsc.approve(address(dsce), AMOUNT_DSC_TO_MINT);
         vm.expectRevert(DSCEngine.DSCEngine__NeedsMoreThanZero.selector);
@@ -408,12 +407,12 @@ contract DSCEngineTest is Test {
         int256 ethUsdUpdatedPrice = 18e8; // 1 ETH = $18
         MockV3Aggregator(ethUsdPriceFeed).updateAnswer(ethUsdUpdatedPrice);
 
-        ERC20Mock(weth).mint(LIQUIDATOR, COLLATERAL_TO_COVER);
+        ERC20Mock(weth).mint(LIQUIDATOR, AMOUNT_COLLATERAL);
 
         vm.startPrank(LIQUIDATOR);
 
-        ERC20Mock(weth).approve(address(dsce), COLLATERAL_TO_COVER);
-        dsce.depositCollateralAndMintDsc(weth, COLLATERAL_TO_COVER, AMOUNT_DSC_TO_MINT);
+        ERC20Mock(weth).approve(address(dsce), AMOUNT_COLLATERAL);
+        dsce.depositCollateralAndMintDsc(weth, AMOUNT_COLLATERAL, AMOUNT_DSC_TO_MINT);
 
         dsc.approve(address(dsce), AMOUNT_DSC_TO_MINT);
         vm.expectRevert(DSCEngine.DSCEngine__HealthFactorOk.selector);
@@ -455,14 +454,13 @@ contract DSCEngineTest is Test {
         uint256 bonusCollateral = (tokenAmountFromDebtCovered * LIQUIDATION_BONUS) / LIQUIDATION_PRECISION;
         uint256 totalCollateralToRedeem = tokenAmountFromDebtCovered + bonusCollateral;
 
-        // console.log(totalCollateralToRedeem);
-        // console.log(AMOUNT_COLLATERAL_LIQUIDATEABLE - totalCollateralToRedeem);
-        // console.log(AMOUNT_COLLATERAL_LIQUIDATOR + totalCollateralToRedeem);
-
         assertEq(dsce.getCollateralBalanceOfUser(USER, weth), AMOUNT_COLLATERAL_LIQUIDATEABLE - totalCollateralToRedeem);
     }
 
-    function test_BurnsDscOnBehalfOfUserFromCaller() public {}
+    function test_BurnsDscOnBehalfOfUserFromCaller() public liquidated {
+        assertEq(dsce.getDSCMintedAmountOfUser(USER), 0);
+        assertEq(DecentralizedStableCoin(dsc).balanceOf(LIQUIDATOR), 0);
+    }
 
     function test_RevertsIfEndingUserHealthFactorIsSmallerThanStartingUserHealthFactor() public {}
 
