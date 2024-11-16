@@ -496,6 +496,54 @@ contract DSCEngineTest is Test {
     }
 
     /////////////////////////////////////
+    // price Tests //
+    /////////////////////////////////////
+
+    function test_GetUsdValue() public view {
+        uint256 expectedUsdValue = 2000 * 10;
+        uint256 usdValue = dsce.getUsdValue(weth, 10);
+        assertEq(usdValue, expectedUsdValue);
+    }
+
+    ///////////////////////////////////////
+    // depositCollateralAndMintDsc Tests //
+    ///////////////////////////////////////
+
+    function test_RevertsIfMintedDscBreaksHealthFactor() public {
+        (, int256 price,,,) = MockV3Aggregator(ethUsdPriceFeed).latestRoundData();
+        uint256 amountCollateral = 10 ether;
+        uint256 amountToMint;
+
+        amountToMint = (amountCollateral * (uint256(price) * dsce.getAdditionalFeedPrecision())) / dsce.getPrecision();
+        vm.startPrank(USER);
+        ERC20Mock(weth).approve(address(dsce), amountCollateral);
+
+        uint256 expectedHealthFactor =
+            dsce.calculateHealthFactor(amountToMint, dsce.getUsdValue(weth, amountCollateral));
+
+        vm.expectRevert(abi.encodeWithSelector(DSCEngine.DSCEngine__BreaksHealthFactor.selector, expectedHealthFactor));
+        dsce.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
+        vm.stopPrank();
+    }
+
+    function test_CanMintWithDepositedCollateral() public depositedCollateralAndMintedDsc {
+        uint256 userBalance = dsc.balanceOf(USER);
+        assertEq(userBalance, AMOUNT_DSC_TO_MINT);
+    }
+
+    ///////////////////////////////////
+    // redeemCollateralForDsc Tests //
+    //////////////////////////////////
+
+    ////////////////////////
+    // healthFactor Tests //
+    ////////////////////////
+
+    ///////////////////////////////////
+    // View & Pure Function Tests //
+    //////////////////////////////////
+
+    /////////////////////////////////////
     // getAccountCollateralValue Tests //
     /////////////////////////////////////
 

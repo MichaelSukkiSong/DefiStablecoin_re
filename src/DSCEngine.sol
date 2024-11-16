@@ -291,4 +291,12 @@ contract DSCEngine is ReentrancyGuard {
     function getDSCMintedAmountOfUser(address user) external view returns (uint256) {
         return s_DSCMinted[user];
     }
+
+    function getPrecision() external pure returns (uint256) {
+        return PRECISION;
+    }
+
+    function getAdditionalFeedPrecision() external pure returns (uint256) {
+        return ADDITIONAL_FEED_PRECISION;
+    }
 }
