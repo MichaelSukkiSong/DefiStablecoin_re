@@ -301,6 +301,21 @@ contract DSCEngineTest is Test {
         vm.stopPrank();
     }
 
+    function testRevertsIfMintAmountBreaksHealthFactor() public depositedCollateral {
+        uint256 amountToMint;
+
+        (, int256 price,,,) = MockV3Aggregator(ethUsdPriceFeed).latestRoundData();
+        amountToMint = (AMOUNT_COLLATERAL * (uint256(price) * dsce.getAdditionalFeedPrecision())) / dsce.getPrecision();
+
+        vm.startPrank(USER);
+        uint256 expectedHealthFactor =
+            dsce.calculateHealthFactor(amountToMint, dsce.getUsdValue(weth, AMOUNT_COLLATERAL));
+
+        vm.expectRevert(abi.encodeWithSelector(DSCEngine.DSCEngine__BreaksHealthFactor.selector, expectedHealthFactor));
+        dsce.mintDsc(amountToMint);
+        vm.stopPrank();
+    }
+
     ///////////////////
     // burnDsc Tests //
     ///////////////////
