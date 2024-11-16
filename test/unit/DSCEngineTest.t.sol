@@ -550,6 +550,26 @@ contract DSCEngineTest is Test {
     // redeemCollateralForDsc Tests //
     //////////////////////////////////
 
+    function test_MustRedeemMoreThanZero() public depositedCollateralAndMintedDsc {
+        vm.startPrank(USER);
+        dsc.approve(address(dsce), AMOUNT_DSC_TO_MINT);
+        vm.expectRevert(DSCEngine.DSCEngine__NeedsMoreThanZero.selector);
+        dsce.redeemCollateralForDsc(weth, 0, AMOUNT_DSC_TO_MINT);
+        vm.stopPrank();
+    }
+
+    function test_CanRedeemDepositedCollateral() public {
+        vm.startPrank(USER);
+        ERC20Mock(weth).approve(address(dsce), AMOUNT_COLLATERAL);
+        dsce.depositCollateralAndMintDsc(weth, AMOUNT_COLLATERAL, AMOUNT_DSC_TO_MINT);
+        dsc.approve(address(dsce), AMOUNT_DSC_TO_MINT);
+        dsce.redeemCollateralForDsc(weth, AMOUNT_COLLATERAL, AMOUNT_DSC_TO_MINT);
+        vm.stopPrank();
+
+        uint256 userBalance = dsc.balanceOf(USER);
+        assertEq(userBalance, 0);
+    }
+
     ////////////////////////
     // healthFactor Tests //
     ////////////////////////
@@ -557,16 +577,4 @@ contract DSCEngineTest is Test {
     ///////////////////////////////////
     // View & Pure Function Tests //
     //////////////////////////////////
-
-    /////////////////////////////////////
-    // getAccountCollateralValue Tests //
-    /////////////////////////////////////
-
-    ///////////////////////
-    // getUsdValue Tests //
-    ///////////////////////
-
-    /////////////////////////////////
-    // getTokenAmountFromUsd Tests //
-    /////////////////////////////////
 }
