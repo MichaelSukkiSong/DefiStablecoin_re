@@ -574,6 +574,31 @@ contract DSCEngineTest is Test {
     // healthFactor Tests //
     ////////////////////////
 
+    function test_ProperlyReportsHealthFactor() public depositedCollateralAndMintedDsc {
+        uint256 expectedHealthFactor = 10000 ether;
+        uint256 healthFactor = dsce.healthFactor(USER);
+        console.log(healthFactor);
+        // 10 ether : collateral -> 20000 USD
+        // 1 ether : minted
+        // so 20000 / 2 = 10000 = collateralAdjustedForThreshold
+        // 10000 / 1 = 10000 = healthFactor
+
+        assertEq(healthFactor, expectedHealthFactor);
+    }
+
+    function test_HealthFactorCanGoBelowOne() public depositedCollateralAndMintedDsc {
+        int256 ethUsdUpdatedPrice = 18e8; // 1 ETH = $18
+        MockV3Aggregator(ethUsdPriceFeed).updateAnswer(ethUsdUpdatedPrice);
+
+        uint256 userHealthFactor = dsce.healthFactor(USER);
+        // 10 ether : collateral -> 180 USD
+        // 1 ether : minted
+        // so 180 / 2 = 90 = collateralAdjustedForThreshold
+        // 90 / 1 = 90 = healthFactor
+
+        assert(userHealthFactor == 90 ether);
+    }
+
     ///////////////////////////////////
     // View & Pure Function Tests //
     //////////////////////////////////
