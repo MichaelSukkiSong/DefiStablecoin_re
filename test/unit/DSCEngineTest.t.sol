@@ -637,4 +637,24 @@ contract DSCEngineTest is Test {
         uint256 additionalFeedPrecision = dsce.getAdditionalFeedPrecision();
         assertEq(additionalFeedPrecision, 1e10);
     }
+
+    function test_GetLiquidationThreshold() public view {
+        uint256 liquidationThreshold = dsce.getLiquidationThreshold();
+        assertEq(liquidationThreshold, 50);
+    }
+
+    function test_GetLiquidationBonus() public view {
+        uint256 liquidationBonus = dsce.getLiquidationBonus();
+        assertEq(liquidationBonus, 10);
+    }
+
+    function test_GetLiquidationPrecision() public view {
+        uint256 liquidationPrecision = dsce.getLiquidationPrecision();
+        assertEq(liquidationPrecision, 100);
+    }
+
+    function test_GetMinHealthFactor() public view {
+        uint256 minHealthFactor = dsce.getMinHealthFactor();
+        assertEq(minHealthFactor, 1e18);
+    }
 }
