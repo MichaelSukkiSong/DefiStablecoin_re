@@ -602,4 +602,39 @@ contract DSCEngineTest is Test {
     ///////////////////////////////////
     // View & Pure Function Tests //
     //////////////////////////////////
+
+    function test_GetPriceFeedAddress() public view {
+        address priceFeed = dsce.getPriceFeedAddress(weth);
+        assertEq(priceFeed, ethUsdPriceFeed);
+    }
+
+    function test_GetCollateralTokens() public view {
+        address[] memory collateralTokens = dsce.getCollateralTokens();
+        assertEq(collateralTokens[0], weth);
+    }
+
+    function test_GetDSC() public view {
+        DecentralizedStableCoin i_dsc = dsce.getDSC();
+        assert(i_dsc == DecentralizedStableCoin(address(dsc)));
+    }
+
+    function test_GetCollateralBalanceOfUser() public depositedCollateral {
+        uint256 collateralBalance = dsce.getCollateralBalanceOfUser(USER, weth);
+        assertEq(collateralBalance, AMOUNT_COLLATERAL);
+    }
+
+    function test_GetDSCMintedAmountOfUser() public depositedCollateralAndMintedDsc {
+        uint256 dscMintedAmount = dsce.getDSCMintedAmountOfUser(USER);
+        assertEq(dscMintedAmount, AMOUNT_DSC_TO_MINT);
+    }
+
+    function test_GetPrecision() public view {
+        uint256 precision = dsce.getPrecision();
+        assertEq(precision, 1e18);
+    }
+
+    function test_GetAdditionalFeedPrecision() public view {
+        uint256 additionalFeedPrecision = dsce.getAdditionalFeedPrecision();
+        assertEq(additionalFeedPrecision, 1e10);
+    }
 }
