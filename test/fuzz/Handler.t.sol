@@ -14,6 +14,8 @@ contract Handler is Test {
     ERC20Mock weth;
     ERC20Mock wbtc;
 
+    address[] public usersWithCollateralDeposited;
+
     uint256 constant MAX_DEPOSIT_SIZE = type(uint96).max;
 
     constructor(DSCEngine _dscEngine, DecentralizedStableCoin _dsc) {
@@ -34,6 +36,8 @@ contract Handler is Test {
         collateral.approve(address(dsce), amountCollateral);
         dsce.depositCollateral(address(collateral), amountCollateral);
         vm.stopPrank();
+
+        usersWithCollateralDeposited.push(msg.sender);
     }
 
     function redeemCollateral(uint256 tokenCollateralSeed, uint256 amountCollateral) public {
@@ -45,6 +49,29 @@ contract Handler is Test {
         }
 
         dsce.redeemCollateral(address(collateral), amountCollateral);
+    }
+
+    function mintDsc(uint256 addressSeed, uint256 amoutDscToMint) public {
+        if (usersWithCollateralDeposited.length == 0) {
+            return;
+        }
+
+        address sender = usersWithCollateralDeposited[addressSeed % usersWithCollateralDeposited.length];
+        (uint256 totalDscMinted, uint256 collateralValueInUsd) = dsce.getAccountInformation(sender);
+
+        int256 maxDscToMint = int256(collateralValueInUsd / 2) - int256(totalDscMinted);
+        if (maxDscToMint < 0) {
+            return;
+        }
+
+        amoutDscToMint = bound(amoutDscToMint, 0, uint256(maxDscToMint));
+        if (amoutDscToMint == 0) {
+            return;
+        }
+
+        vm.startPrank(sender);
+        dsce.mintDsc(amoutDscToMint);
+        vm.stopPrank();
     }
 
     function _getTokenCollateralFromSeed(uint256 tokenCollateralSeed) public view returns (ERC20Mock) {
