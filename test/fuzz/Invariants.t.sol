@@ -42,4 +42,15 @@ contract Invariants is StdInvariant, Test {
 
         assert(wethValue + wbtcValue >= totalSupply);
     }
+
+    function invariant_getterShouldNotRevert() public view {
+        dsce.getCollateralTokens();
+        dsce.getDSC();
+        dsce.getPrecision();
+        dsce.getAdditionalFeedPrecision();
+        dsce.getLiquidationThreshold();
+        dsce.getLiquidationBonus();
+        dsce.getLiquidationPrecision();
+        dsce.getMinHealthFactor();
+    }
 }
